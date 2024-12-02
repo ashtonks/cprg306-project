@@ -2,6 +2,7 @@
 
 import { useUserAuth } from "../_utils/auth-context";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function UserLogin() {
   const { user, gitHubSignIn, firebaseSignOut } = useUserAuth();
@@ -38,7 +39,7 @@ export default function UserLogin() {
             Sign in with GitHub
           </button>
           <div>
-            <a href="/">Home</a>
+            <Link href="/">Home</Link>
           </div>
         </div>
       )}
