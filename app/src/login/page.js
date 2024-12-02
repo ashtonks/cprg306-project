@@ -27,7 +27,7 @@ export default function UserLogin() {
             <button onClick={firebaseSignOut}>Sign out</button>
           </div>
           <div>
-            <a href="/">Home</a>
+            <Link href="/">Home</Link>
           </div>
         </div>
       ) : (
