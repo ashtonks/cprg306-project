@@ -57,6 +57,8 @@ const styles = {
     padding: "250px",
     backgroundColor: "#1c1917",
     borderRadius: "10px",
+    borderWidth: "2px",
+    borderColor: "#1e3a8a",
   },
   divContainer: {
     backgroundColor: "#1e1b4b",
