@@ -1,3 +1,7 @@
+Project hosted on vercel: https://cprg306-project-n65mtz6gs-ashtons-projects-2e7b0090.vercel.app/
+
+To run locally, follow steps below:
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
