@@ -1,5 +1,15 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { db, commentsCollection } from "../../app/src/_utils/firebase";
+import {
+  query,
+  where,
+  orderBy,
+  getDocs,
+  collection,
+  addDoc,
+} from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth"; // Import Firebase Authentication
 
 const MovieDetails = () => {
   const router = useRouter();
@@ -7,6 +17,23 @@ const MovieDetails = () => {
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cast, setCast] = useState(null); // State to store cast information
+  const [comments, setComments] = useState([]); // State to store comments
+  const [newComment, setNewComment] = useState(""); // State to hold new comment input
+  const [currentUser, setCurrentUser] = useState(null); // State to store the authenticated user
+
+  // Set up listener to track the current authenticated user
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user); // Store user info when logged in
+      } else {
+        setCurrentUser(null); // Clear user info when logged out
+      }
+    });
+
+    return () => unsubscribe(); // Clean up on unmount
+  }, []);
 
   useEffect(() => {
     document.body.style.backgroundColor = "#1c1917"; // Set the background color explicitly
@@ -34,6 +61,16 @@ const MovieDetails = () => {
         const castData = await castResponse.json();
         setCast(castData.cast); // Update cast state
 
+        // Fetch comments for the movie
+        const commentsQuery = query(
+          commentsCollection,
+          where("movieId", "==", id),
+          orderBy("timestamp", "desc")
+        );
+        const querySnapshot = await getDocs(commentsQuery);
+        const commentsData = querySnapshot.docs.map((doc) => doc.data());
+        setComments(commentsData);
+
         setLoading(false);
       } catch (error) {
         console.error("Failed to fetch movie details:", error);
@@ -44,10 +81,40 @@ const MovieDetails = () => {
     fetchMovieDetails();
   }, [id]);
 
+  const handleCommentSubmit = async (event) => {
+    event.preventDefault();
+    if (!newComment.trim()) return; // Don't submit empty comments
+
+    try {
+      if (!currentUser) {
+        alert("Please log in to post comments."); // Alert if not logged in
+        return;
+      }
+
+      // Add new comment to Firestore
+      const newCommentData = {
+        movieId: id,
+        userId: currentUser.uid, // Use the actual user ID
+        userName: currentUser.displayName || "Anonymous", // Use the user's display name or fallback to "Anonymous"
+        comment: newComment,
+        timestamp: new Date(),
+      };
+
+      await addDoc(collection(db, "comments"), newCommentData);
+
+      // Optimistically update the comments state
+      setComments((prevComments) => [newCommentData, ...prevComments]);
+
+      // Clear the input after submitting
+      setNewComment("");
+    } catch (error) {
+      console.error("Failed to post comment:", error);
+    }
+  };
+
   if (loading) return <p>Loading...</p>;
   if (!movie) return <p>Movie not found.</p>;
 
-  // Check if movie.release_date and movie.vote_average are available
   const posterUrl = movie.poster_path
     ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
     : "https://via.placeholder.com/500x750?text=No+Poster+Available"; // Placeholder image URL
@@ -58,7 +125,6 @@ const MovieDetails = () => {
       : "Rating not available";
   const runtime = movie.runtime || "Runtime not available";
 
-  // Format cast into a string (just the first 5 cast members)
   const castList = cast
     ? cast
         .slice(0, 5)
@@ -86,12 +152,35 @@ const MovieDetails = () => {
             <strong>Cast:</strong> {castList}
           </p>
         </div>
-        <button
-          onClick={() => router.push("/")} // Navigate back to the home page
-          style={styles.button}
-        >
-          Go Back to Home
-        </button>
+
+        <div style={styles.commentsSection}>
+          <h2 style={styles.commentHeader}>Comments</h2>
+          <div style={styles.commentList}>
+            {comments.map((comment, index) => (
+              <div key={index} style={styles.comment}>
+                <p>
+                  <strong>{comment.userName}:</strong> {comment.comment}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={handleCommentSubmit} style={styles.commentForm}>
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              style={styles.commentInput}
+            />
+
+            <button onClick={() => router.push("/")} style={styles.button}>
+              Go Back to Home
+            </button>
+            <button type="submit" style={styles.button}>
+              Post Comment
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -119,6 +208,9 @@ const styles = {
     boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)",
     textAlign: "center",
   },
+  commentHeader: {
+    color: "white",
+  },
   title: {
     fontSize: "2rem",
     marginBottom: "15px",
@@ -143,7 +235,7 @@ const styles = {
     marginTop: "20px",
   },
   button: {
-    marginTop: "20px",
+    margin: "30px",
     padding: "10px 20px",
     backgroundColor: "#ea580c",
     color: "white",
@@ -152,6 +244,34 @@ const styles = {
     cursor: "pointer",
     fontSize: "1rem",
     boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.6)",
+  },
+  commentList: {
+    marginTop: "20px",
+  },
+  comment: {
+    backgroundColor: "#444",
+    padding: "10px",
+    marginBottom: "10px",
+    borderRadius: "5px",
+    color: "white",
+  },
+  commentInput: {
+    width: "95%",
+    height: "100px",
+    padding: "10px",
+    borderRadius: "5px",
+    border: "1px solid orange",
+    marginBottom: "10px",
+    resize: "none",
+    boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.6)",
+  },
+  submitButton: {
+    backgroundColor: "#ea580c",
+    color: "white",
+    border: "none",
+    padding: "10px 20px",
+    borderRadius: "5px",
+    cursor: "pointer",
   },
 };
 
